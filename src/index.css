@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Opcional: Define a fonte 'Inter' globalmente, se disponível, ou usa a fallback sans-serif */
+body {
+    font-family: 'Inter', sans-serif;
+    /* Garante que o fundo do corpo seja escuro para corresponder ao tema do app */
+    background-color: #111827; 
+}
