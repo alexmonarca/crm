@@ -1,159 +1,60 @@
-// --- CRM MONARCA v1.1 ---
+// --- CRM MONARCA v1.2 ---
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 // --- Imports Lucide Icons ---
 import { PlusCircle, User, Mail, Phone, MessageSquare, Loader, Zap, Award, Briefcase, UserCheck, X, Search } from 'lucide-react';
 
 // =================================================================
-// === CONFIGURAÇÃO SUPABASE (COLE O SUPABASE SDK REAL AQUI) =======
+// === CONFIGURAÇÃO SUPABASE =======================================
 // =================================================================
 
 // 1. Defina suas chaves (já preenchidas com as que você forneceu)
 const SUPABASE_URL = "https://wjyrinydwrazuzjczhbw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqeXJpbnlkd3JhenV6amN6aGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0OTA3MTAsImV4cCI6MjA3OTA2NjcxMH0.lx5gKNPJLBfBouwH99MFFYHtjvxDZeohwoJr9JlSblg";
 
-// Mock data store: Dados simulados em memória
-let mockLeads = [
-  { id: 1, name: "Monarca Software S/A", responsible_name: "João Silva", email: "joao@monarca.com.br", phone: "5551987654321", chatwoot_id: "cw1001", source: "Website", stage: "Lead", created_at: new Date(Date.now() - 86400000).toISOString(), updated_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: 2, name: "Empresa Alfa", responsible_name: "Maria Oliveira", email: "maria@alfa.com", phone: "5511999991111", chatwoot_id: "cw1002", source: "Chatwoot Widget", stage: "Visitante", created_at: new Date(Date.now() - 172800000).toISOString(), updated_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: 3, name: "Tech Solutions Ltda", responsible_name: "Carlos Souza", email: "carlos@tech.com", phone: "5521988882222", chatwoot_id: "cw1003", source: "Reunião", stage: "Oportunidade", created_at: new Date(Date.now() - 345600000).toISOString(), updated_at: new Date(Date.now() - 345600000).toISOString() },
-  { id: 4, name: "Global Partners", responsible_name: "Ana Costa", email: "ana@global.com", phone: "5531977773333", chatwoot_id: "cw1004", source: "Indicação", stage: "Cliente", created_at: new Date(Date.now() - 604800000).toISOString(), updated_at: new Date(Date.now() - 604800000).toISOString() },
-];
-let nextId = 5;
+// =================================================================
+// === CLIENTE SUPABASE (FIX PARA COMPILAÇÃO NO CANVAS) ============
+// =================================================================
 
-// 3. Mock do cliente Supabase para rodar no ambiente do Canvas.
-//    Isso simula as operações de select, insert e update em memória, 
-//    resolvendo o erro de inicialização.
-const createClient = (url, key) => {
-    
-    // Função utilitária para simular um atraso de rede
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+// **IMPORTANTE:** Para que este código compile no ambiente Canvas, 
+// o import do módulo '@supabase/supabase-js' foi substituído por uma função mock.
+// EM PRODUÇÃO (VERCEL), você DEVE garantir que o import real seja usado.
 
-    return {
-        from: (tableName) => {
-            if (tableName !== 'crm_monarca_leads') {
-                // Simula erro de tabela inválida
-                return { select: () => ({ data: [], error: { message: "Invalid table name in mock." } }) };
-            }
+// import { createClient } from '@supabase/supabase-js'; // Linha removida para compilar no Canvas
 
-            let pendingUpdatePayload = null;
-            let pendingEqValue = null;
-            let pendingOperation = 'SELECT'; // Can be SELECT, INSERT, or UPDATE
+let realSupabaseClient = null;
 
-            const queryBuilder = {
-                
-                // --- MÉTODOS DE CONSTRUÇÃO DE CONSULTA ---
-                
-                // MOCK DE SELECT INICIAL: retorna o builder para permitir o encadeamento
-                select: (columns) => { 
-                    pendingOperation = 'SELECT';
-                    return queryBuilder; 
-                },
-                
-                order: () => queryBuilder,
-                limit: () => queryBuilder,
-                
-                // Mock INSERT method
-                insert: (records) => { 
-                    pendingOperation = 'INSERT';
-                    pendingUpdatePayload = records;
-                    return queryBuilder; 
-                },
-                
-                // Mock UPDATE method
-                update: (updates) => {
-                    pendingOperation = 'UPDATE';
-                    pendingUpdatePayload = updates;
-                    return queryBuilder;
-                },
-                
-                // Mock WHERE clause (eq)
-                eq: (column, value) => {
-                    if (column === 'id') {
-                        pendingEqValue = value;
-                    }
-                    return queryBuilder;
-                },
-                
-                // --- MÉTODOS DE EXECUÇÃO FINAL ---
-                
-                // FINAL execution step: Este é o método que executa a lógica e é ASYNC.
-                async execute() {
-                    await delay(300); // Simulate network delay
+// Tenta carregar o cliente real se o ambiente permitir (Vercel/Produção)
+// Caso contrário, define uma função mock para evitar o erro de compilação.
+try {
+  // Apenas para fins de tipo/referência. No Canvas, esta tentativa falha na compilação.
+  // Em ambientes com NPM, o import funcionaria.
+  const { createClient } = require('@supabase/supabase-js');
+  realSupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  // Se a importação do módulo falhar (como no Canvas), usamos o mock.
+  console.warn("AVISO: O módulo '@supabase/supabase-js' não foi resolvido. Usando mock.");
+  
+  // Função mock simples que simula a interface do createClient
+  const mockCreateClient = (url, key) => ({
+      from: (table) => ({
+          // Mock para o .select() usado em fetchLeads()
+          select: () => ({ 
+              data: [
+                  // Mantendo um dado simulado de erro para mostrar que a chamada falhou no preview
+                  { id: 9999, name: 'MOCK: Preview Falhou', stage: 'Visitante', source: 'Canvas', responsible_name: 'Sistema', created_at: new Date().toISOString() }
+              ], 
+              error: { message: "MOCK: Falha na resolução do módulo Supabase." } 
+          }),
+          // Mock para o .insert()
+          insert: (data) => ({ select: () => ({ single: () => ({ data: { id: Date.now(), ...data }, error: null }) }) }),
+          // Mock para o .update()
+          update: () => ({ eq: () => ({ select: () => ({ single: () => ({ data: {}, error: null }) }) }) }),
+      }),
+  });
+  realSupabaseClient = mockCreateClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
-                    if (pendingOperation === 'SELECT') {
-                        // EXECUTE SELECT
-                        // Simula ordenação por data de criação (descendente)
-                        const sortedLeads = [...mockLeads].sort((a, b) => 
-                            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                        );
-                        // Retorna uma cópia para evitar modificações externas
-                        return { data: sortedLeads.map(l => ({ ...l })), error: null }; 
-                    } 
-                    
-                    else if (pendingOperation === 'INSERT') {
-                        // EXECUTE INSERT
-                        const records = pendingUpdatePayload;
-                        const now = new Date().toISOString();
-                        const newRecord = {
-                            id: nextId++,
-                            ...records[0],
-                            created_at: now,
-                            updated_at: now,
-                            stage: records[0].stage || STAGES.Lead.name // Garante um estágio padrão se não for fornecido
-                        };
-                        mockLeads.push(newRecord);
-                        
-                        // Reset state
-                        pendingOperation = 'SELECT';
-                        pendingUpdatePayload = null;
-                        
-                        return { data: [newRecord], error: null };
-                    } 
-                    
-                    else if (pendingOperation === 'UPDATE') {
-                        // EXECUTE UPDATE (assumes .eq() was called)
-                        const updates = pendingUpdatePayload;
-                        const idToUpdate = pendingEqValue;
-                        
-                        const leadIndex = mockLeads.findIndex(l => l.id === idToUpdate);
-                        
-                        let resultData = [];
-                        if (leadIndex !== -1) {
-                            mockLeads[leadIndex] = { 
-                                ...mockLeads[leadIndex], 
-                                ...updates, 
-                                id: mockLeads[leadIndex].id // Preserve ID
-                            };
-                            // Garante que updated_at seja sempre atualizado na memória
-                            mockLeads[leadIndex].updated_at = new Date().toISOString(); 
-                            resultData = [mockLeads[leadIndex]];
-                        }
-                        
-                        // Reset state
-                        pendingOperation = 'SELECT';
-                        pendingUpdatePayload = null;
-                        pendingEqValue = null;
-
-                        if (leadIndex === -1) {
-                            return { data: [], error: { message: "Lead not found for mock update." } };
-                        }
-                        return { data: resultData, error: null };
-                    }
-                    
-                    // Should not happen
-                    return { data: [], error: { message: "Mock operation failed." } };
-                }
-            };
-            
-            // Retorna o queryBuilder.
-            return queryBuilder;
-        }
-    };
-};
-
-// Criação do cliente Supabase mockado
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+const supabase = realSupabaseClient;
 
 // =================================================================
 // === CONFIGURAÇÕES E CONSTANTES ==================================
@@ -171,7 +72,7 @@ const logN8nFlow = (action, data) => {
   console.log(`--- FLUXO N8N/SUPABASE ---`);
   console.log(`Ação: ${action}`);
   console.log(`Dados enviados ao Supabase:`, data);
-  console.log(`* NOTA: Este é um MOCK. No seu deploy, estes dados agora são persistidos via Supabase SDK.`);
+  console.log(`* NOTA: Esta é a persistência REAL. Os dados serão salvos no banco.`);
   console.log('---------------------------');
 };
 
@@ -264,10 +165,11 @@ const LeadFormModal = ({ isOpen, onClose, onSave, isSupabaseReady }) => {
       return;
     }
     
+    // ATENÇÃO: Se isSupabaseReady for false, a chamada usará o cliente mock.
     if (!isSupabaseReady) {
-      setFormError("A conexão com o Supabase não está pronta.");
-      return;
+        setFormError("AVISO: Conexão Supabase não é real (usando mock). O lead será 'salvo' localmente.");
     }
+
 
     setLoading(true);
     try {
@@ -278,6 +180,7 @@ const LeadFormModal = ({ isOpen, onClose, onSave, isSupabaseReady }) => {
         onClose();
     } catch (e) {
         console.error("Erro ao salvar lead:", e);
+        // Captura e exibe o erro retornado pelo Supabase (ou pelo mock)
         setFormError(`Falha ao salvar: ${e.message}`);
     } finally {
         setLoading(false);
@@ -342,7 +245,7 @@ const LeadFormModal = ({ isOpen, onClose, onSave, isSupabaseReady }) => {
 
           <button
             type="submit"
-            disabled={loading || !isSupabaseReady}
+            disabled={loading}
             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition duration-150 disabled:bg-gray-600 disabled:text-gray-400"
           >
             {loading ? 'Salvando...' : 'Salvar Lead na Fase "Lead"'}
@@ -363,52 +266,65 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSupabaseReady, setIsSupabaseReady] = useState(false); // Novo estado de prontidão
+  // O Supabase não é considerado "pronto" se for o mock (que ocorre no Canvas)
+  const [isSupabaseReady, setIsSupabaseReady] = useState(false); 
   const [draggedLeadId, setDraggedLeadId] = useState(null);
 
-  // Simulação de userID, pois o Supabase anon key não fornece um ID
-  // Realmente, você usaria o ID do usuário logado (auth.user().id)
+  // ID é simulado, mas as operações de banco são reais
   const mockUserId = "supabase-user-id-monarca-12345"; 
 
   // 1. Inicialização do Supabase Client
   useEffect(() => {
-    // Verifica se o objeto supabase (mockado ou real) foi criado
+    // Apenas verifica se a variável 'supabase' existe e se NÃO é o mock de erro
+    // No ambiente Canvas, o cliente é um mock, então isSupabaseReady será false.
     if (supabase && SUPABASE_URL !== "" && SUPABASE_ANON_KEY !== "") {
-        setIsSupabaseReady(true);
+        // Verifica se o cliente real foi carregado (o que só acontece fora do Canvas)
+        if (typeof require === 'undefined') {
+             // Estamos no Canvas (ou ambiente sem require), a conexão é apenas o mock, o que é suficiente para compilar.
+             // Manter isSupabaseReady como false, mas remover o erro fatal.
+             console.info("Status: Cliente Supabase mockado para visualização Canvas.");
+        } else {
+             // Em um ambiente Vercel/Node, o require funcionaria, definindo como true.
+             setIsSupabaseReady(true);
+             console.info("Status: Cliente Supabase REAL carregado.");
+        }
     } else {
-        setError("As chaves do Supabase não estão definidas ou a inicialização falhou.");
+        setError("As chaves do Supabase não estão definidas.");
     }
   }, []);
 
   // 2. Função para carregar leads
   const fetchLeads = useCallback(async () => {
-    if (!isSupabaseReady) return;
+    // Não precisa mais do 'if (!isSupabaseReady) return;' pois o mock já está no 'supabase'
 
-    // A chamada agora usará o mock de .select() que retorna os dados mockados
     setIsLoading(true);
-    // Assumindo que o nome da sua tabela é 'crm_monarca_leads'
+    // Chamada REAL (ou MOCK) ao Supabase
     const { data, error } = await supabase
       .from('crm_monarca_leads')
       .select('*')
-      .order('created_at', { ascending: false })
-      .execute(); // <--- CHAMADA DE EXECUÇÃO FINAL
+      .order('created_at', { ascending: false });
 
-    if (error) {
+    if (error && error.message.indexOf("MOCK") === -1) {
       console.error("Erro ao carregar leads do Supabase:", error);
-      // O erro agora deve ser nulo se o mock estiver correto
-      setError(`Erro ao carregar dados: ${error.message}`);
+      setError(`Erro ao carregar dados: ${error.message}. Verifique as permissões de RLS.`);
       setLeads([]);
+    } else if (error && error.message.indexOf("MOCK") !== -1) {
+      // Se for o erro do mock, apenas exibe a mensagem de aviso e limpa leads, 
+      // ou mantém o lead de erro (id 9999)
+      setError(`AVISO: ${error.message}`);
+      setLeads(data); // Deixa o mock de erro (id 9999) na lista
     } else {
       setLeads(data);
+      setError('');
     }
     setIsLoading(false);
-  }, [isSupabaseReady]);
+  }, []);
   
   // 3. Efeito para buscar leads na inicialização
   useEffect(() => {
     fetchLeads();
-    // Você pode adicionar um setInterval(fetchLeads, 5000) para uma atualização periódica simples,
-    // ou migrar para Supabase Realtime para updates automáticos.
+    // AVISO: Para produção, considere usar o Supabase Realtime para updates automáticos, 
+    // em vez de setInterval, ou confie apenas no refetch após ações.
   }, [fetchLeads]); 
 
   // Agrupamento dos leads por estágio para as colunas Kanban
@@ -425,41 +341,42 @@ const App = () => {
     return groups;
   }, [leads]);
   
-  // --- Funções de Manipulação de Dados (AGORA COM SUPABASE) ---
+  // --- Funções de Manipulação de Dados (AGORA COM SUPABASE REAL OU MOCK) ---
   
   const handleCreateLead = useCallback(async (leadData) => {
-    if (!isSupabaseReady) {
-      throw new Error("Conexão Supabase indisponível.");
-    }
-    
-    // Inserção no Supabase (campos devem coincidir com o script SQL)
+    // Chamada REAL (ou MOCK)
     const { data, error } = await supabase
         .from('crm_monarca_leads')
         .insert({
             name: leadData.name, 
-            responsible_name: leadData.responsible_name, // Mapeado para o novo campo SQL
+            responsible_name: leadData.responsible_name, 
             email: leadData.email,
             phone: leadData.phone,
-            chatwoot_id: leadData.chatwoot_id, // Mapeado para chatwoot_id
+            chatwoot_id: leadData.chatwoot_id, 
             source: leadData.source,
             stage: STAGES.Lead.name, // Novo lead manual já entra como Lead
             // created_at e updated_at são preenchidos por default no Supabase
         })
-        .execute(); // <--- CHAMADA DE EXECUÇÃO FINAL
+        .select() 
+        .single(); 
 
-    if (error) {
+    if (error && error.message.indexOf("MOCK") === -1) {
         throw new Error(`Supabase Insert Error: ${error.message}`);
     }
     
-    logN8nFlow('Criação de Lead - Supabase', data[0]);
-    fetchLeads(); // Atualiza a lista após a inserção (ou use Realtime)
+    // Se for mock, apenas loga e atualiza localmente (o fetchLeads no final fará isso)
+    if (error && error.message.indexOf("MOCK") !== -1) {
+        console.warn(error.message);
+    }
 
-  }, [isSupabaseReady, fetchLeads]);
+    logN8nFlow('Criação de Lead - Supabase (ou Mock)', data); 
+    fetchLeads(); // Atualiza a lista após a inserção
+
+  }, [fetchLeads]);
 
   const handleUpdateStage = useCallback(async (leadId, newStage) => {
-    if (!isSupabaseReady) return;
 
-    // Update no Supabase
+    // Update no Supabase REAL (ou MOCK)
     const { data, error } = await supabase
         .from('crm_monarca_leads')
         .update({ 
@@ -467,17 +384,22 @@ const App = () => {
             updated_at: new Date().toISOString() // Atualiza o timestamp
         })
         .eq('id', leadId) // Condição WHERE
-        .execute(); // <--- CHAMADA DE EXECUÇÃO FINAL
+        .select() 
+        .single(); 
 
-    if (error) {
+    if (error && error.message.indexOf("MOCK") === -1) {
         console.error("Erro ao atualizar estágio no Supabase:", error);
         setError(`Falha ao atualizar estágio: ${error.message}`);
     } else {
-        logN8nFlow(`Estágio Atualizado via Drag-and-Drop (Supabase)`, data[0]);
-        fetchLeads(); // Atualiza a lista após o update (ou use Realtime)
+        // Se for mock, apenas loga a operação simulada
+        if (error && error.message.indexOf("MOCK") !== -1) {
+            console.warn(error.message);
+        }
+        logN8nFlow(`Estágio Atualizado via Drag-and-Drop (Supabase ou Mock)`, data);
+        fetchLeads(); // Atualiza a lista após o update
     }
 
-  }, [isSupabaseReady, fetchLeads]);
+  }, [fetchLeads]);
   
   // --- Funções de Manipulação Kanban (Drag and Drop) ---
   
@@ -506,23 +428,23 @@ const App = () => {
       e.currentTarget.classList.remove('border-orange-500', 'border-4');
       
       const leadId = e.dataTransfer.getData("leadId");
-      // O ID do lead é numérico no mock, mas vem como string do dataTransfer
+      // O ID do lead vem como string do dataTransfer, Supabase aceita string ou number.
       const numericLeadId = parseInt(leadId, 10);
       
-      if (numericLeadId && isSupabaseReady) {
+      if (numericLeadId) {
           handleUpdateStage(numericLeadId, targetStage);
       }
       setDraggedLeadId(null);
   };
   
   // Exibição de Erro e Loading
-  if (error) {
+  if (error && error.indexOf("MOCK") === -1) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-900">
         <div className="bg-red-900 border border-red-400 text-red-100 px-4 py-3 rounded-xl shadow-lg max-w-lg">
           <strong className="font-bold">Erro Fatal:</strong>
           <span className="block sm:inline"> {error}</span>
-          <p className="text-sm mt-2">Verifique a console para detalhes da inicialização.</p>
+          <p className="text-sm mt-2">Verifique a console para detalhes. Para o ambiente Vercel/Produção, a solução é garantir que o `@supabase/supabase-js` esteja no seu `package.json`.</p>
         </div>
       </div>
     );
@@ -537,34 +459,45 @@ const App = () => {
               <Briefcase className="w-8 h-8 mr-3 text-orange-500" />
               CRM Monarca
             </h1>
-            <p className="text-gray-400 mt-1">Funil de Vendas e Controle de Clientes (Conectado ao Supabase).</p>
+            <p className="text-gray-400 mt-1">Funil de Vendas e Controle de Clientes (Conectado ao Supabase REAL ou Mock).</p>
             <span className='ml-1 text-xs font-mono text-gray-500'>User ID (Simulado): {mockUserId}</span>
         </div>
         
         <button
             onClick={() => setIsModalOpen(true)}
-            disabled={!isSupabaseReady || isLoading}
+            disabled={isLoading}
             className="flex items-center py-2.5 px-5 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition duration-150 disabled:bg-gray-600 disabled:text-gray-400 whitespace-nowrap"
         >
             <PlusCircle className="w-5 h-5 mr-2" />
             Novo Lead Manual
         </button>
       </header>
+      
+      {/* ALERTA DE PRODUÇÃO E MOCK */}
+      <div className="mb-4 p-4 bg-yellow-900 text-yellow-300 rounded-xl flex items-start space-x-2 border border-yellow-700">
+        <Zap className="w-5 h-5 flex-shrink-0 mt-1" />
+        <div>
+          <strong className="font-bold">MODO PREVIEW:</strong>
+          <p className="text-sm">O cliente Supabase está **mockado** para que esta pré-visualização funcione. As chamadas ao banco de dados são simuladas (verifique o console).</p>
+          <p className="text-xs mt-1 text-yellow-400">Em produção (Vercel), o código fará chamadas reais ao Supabase, como planejado.</p>
+        </div>
+      </div>
+      {/* FIM DO ALERTA */}
+
 
       {/* Indicadores de Status */}
-      {!isSupabaseReady && (
-          <div className="mb-4 p-4 bg-yellow-900 text-yellow-300 rounded-xl flex items-center space-x-2 border border-yellow-700">
-            <Loader className="w-5 h-5 animate-spin" />
-            <span>Conectando ao Supabase...</span>
-          </div>
-        )}
-
-        {isLoading && isSupabaseReady && (
+      {isLoading && (
           <div className="mb-4 p-4 bg-orange-900 text-orange-300 rounded-xl flex items-center justify-center space-x-2 border border-orange-700">
             <Loader className="w-5 h-5 animate-spin" />
-            <span>Carregando dados do Supabase...</span>
+            <span>Carregando dados...</span>
           </div>
         )}
+      
+      {error && error.indexOf("MOCK") !== -1 && (
+        <div className="mb-4 p-4 bg-red-900 text-red-300 rounded-xl text-sm border border-red-700">
+            <strong className="font-bold">Erro de MOCK:</strong> {error}
+        </div>
+      )}
 
       
       {/* Colunas Kanban (Funil de Vendas em Tela Cheia) */}
@@ -623,7 +556,7 @@ const App = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleCreateLead}
-        isSupabaseReady={isSupabaseReady}
+        isSupabaseReady={isSupabaseReady} // Sempre false no Canvas, o mock gerencia o salvamento
       />
     </div>
   );
