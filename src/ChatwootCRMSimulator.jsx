@@ -1,3 +1,4 @@
+// --- CRM MONARCA v1.0 ---
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 // --- Imports Lucide Icons ---
 import { PlusCircle, User, Mail, Phone, MessageSquare, Loader, Zap, Award, Briefcase, UserCheck, X, Search } from 'lucide-react';
