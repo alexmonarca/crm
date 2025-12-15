@@ -1,4 +1,4 @@
-// --- CRM MONARCA v1.0 ---
+// --- CRM MONARCA v1.1 ---
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 // --- Imports Lucide Icons ---
 import { PlusCircle, User, Mail, Phone, MessageSquare, Loader, Zap, Award, Briefcase, UserCheck, X, Search } from 'lucide-react';
@@ -41,9 +41,14 @@ const createClient = (url, key) => {
 
             const queryBuilder = {
                 
-                // Mock SELECT chaining methods
-                // O .select() inicial que apenas retornava 'this' foi removido
-                // para evitar a chave duplicada com o método async select() final.
+                // --- MÉTODOS DE CONSTRUÇÃO DE CONSULTA ---
+                
+                // MOCK DE SELECT INICIAL: retorna o builder para permitir o encadeamento
+                select: (columns) => { 
+                    pendingOperation = 'SELECT';
+                    return queryBuilder; 
+                },
+                
                 order: () => queryBuilder,
                 limit: () => queryBuilder,
                 
@@ -69,9 +74,10 @@ const createClient = (url, key) => {
                     return queryBuilder;
                 },
                 
-                // FINAL execution step (called as .select() at the end of all chains)
-                // Este é o método que executa a lógica.
-                async select() {
+                // --- MÉTODOS DE EXECUÇÃO FINAL ---
+                
+                // FINAL execution step: Este é o método que executa a lógica e é ASYNC.
+                async execute() {
                     await delay(300); // Simulate network delay
 
                     if (pendingOperation === 'SELECT') {
@@ -93,6 +99,7 @@ const createClient = (url, key) => {
                             ...records[0],
                             created_at: now,
                             updated_at: now,
+                            stage: records[0].stage || STAGES.Lead.name // Garante um estágio padrão se não for fornecido
                         };
                         mockLeads.push(newRecord);
                         
@@ -138,8 +145,7 @@ const createClient = (url, key) => {
                 }
             };
             
-            // Retorna o queryBuilder. O Supabase-js SDK permite que você
-            // chame .select() ou .insert().select() etc.
+            // Retorna o queryBuilder.
             return queryBuilder;
         }
     };
@@ -384,7 +390,8 @@ const App = () => {
     const { data, error } = await supabase
       .from('crm_monarca_leads')
       .select('*')
-      .order('created_at', { ascending: false }); 
+      .order('created_at', { ascending: false })
+      .execute(); // <--- CHAMADA DE EXECUÇÃO FINAL
 
     if (error) {
       console.error("Erro ao carregar leads do Supabase:", error);
@@ -438,7 +445,7 @@ const App = () => {
             stage: STAGES.Lead.name, // Novo lead manual já entra como Lead
             // created_at e updated_at são preenchidos por default no Supabase
         })
-        .select(); // Retorna o registro inserido
+        .execute(); // <--- CHAMADA DE EXECUÇÃO FINAL
 
     if (error) {
         throw new Error(`Supabase Insert Error: ${error.message}`);
@@ -460,7 +467,7 @@ const App = () => {
             updated_at: new Date().toISOString() // Atualiza o timestamp
         })
         .eq('id', leadId) // Condição WHERE
-        .select();
+        .execute(); // <--- CHAMADA DE EXECUÇÃO FINAL
 
     if (error) {
         console.error("Erro ao atualizar estágio no Supabase:", error);
